@@ -158,6 +158,23 @@ The model contains:
 - a fully connected classifier head
 - dropout regularization
 
+The model achitecture:
+- CNN part:
+1. Conv2d(3, 32, kernel_size=3, padding=1) - next conv2d layer has 32 input channels and 64 output channels(which is input for 3 layer and so on...)
+2. BatchNorm2d(32) - argument is the out_channels from Conv2d
+3. ReLU(inplace=True)
+4. MaxPool2d(2)
+5. AdaptiveAvgPool2d((1, 1)),
+
+- Classifier part:
+1. Flatten()
+2. Linear(256, 128)
+3. BatchNorm1d(128)
+4. ReLU(inplace=True)
+5. Dropout(p=0.3)
+6. Linear(128, num_classes)
+
+   
 Shortly, the model works as follows:
 
 1. extract low-level visual features such as edges and texture
