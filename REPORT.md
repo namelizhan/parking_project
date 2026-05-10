@@ -27,7 +27,7 @@ We implemented a full end-to-end workflow, which consisted of the following step
 - robustness analysis
 - visual system-level output
 
-The original PKLot segmented parking-slot dataset consists of around 700,000 labeled parking-slot images, while our available development machines were CPU-only. Because of this, the final reported experiment was carried out on a reproducible subset that preserved the 70/15/15 train/validation/test split that was used. The final subset was also semi-stratified by parking site and occupancy class to keep it more representative.
+The original PKLot segmented parking-slot dataset consists of around 700,000 labeled parking-slot images, while our available development machines were CPU-only. Because of this, the final reported experiment was carried out on a reproducible subset that preserved the 70/15/15 train/validation/test split that was used. The final subset was also semi-stratified by parking site and occupancy class to keep it more representative. Semi-stratifying means that the proportions of classes will not be exactly as in real life but equal to address the data imbalance problem. In the context of CNNs, semi-stratification: exposes the model to enough variations to develop robust feature maps, ensures stable weight updates in backpropagation by providing balanced classes. 
 
 ## 2. Problem Formulation
 
@@ -99,37 +99,37 @@ The subset was sampled reproducibly with a fixed random seed, and the final subs
 
 ### 4.1 Metadata generation
 
-In the first stage of the pipeline we scan the PKLot archive and generate CSV metadata files for the train, validation, and test splits. These CSV files store:
+In the first stage of the pipeline we iterate through the PKLot archive directory, and extract the folder names to write into CSV metadata files for the train, validation, and test splits. These CSV files store:
 
-- archive member path
-- class label
-- numeric label ID
-- site
-- weather
-- date
-- filename
+- archive member path : ex. "PKLot/PKLot/UFPR04/Cloudy/2012-12-05/image_01.jpg"
+- class label : Empty, Occupied
+- numeric label ID : 0 Empty, 1 Occupied
+- site : parking lot the image came from (PKLot uses three sites: UCPI, UFPR04, and UFPR05)
+- weather : Sunny, Cloudy, or Rainy
+- date 
+- filename : name of the individual image file 
 
-This makes the dataset handling reproducible and decouples data indexing from training.
+This makes the dataset handling reproducible as the data for training/test/validation stage is fixed, and will not change in every run. Also preliminary creation of metadata files decouples data indexing process from training.
 
-### 4.2 Optional extraction
+### 4.2 Modes to load the data
 
-In the project we support two possible loading modes:
+1. reading images directly from the tar archive: memory efficient - no unzipping the whole archive;but slow - every image needs to be located and decompressed
+2. reading extracted images from a normal directory structure: memory inefficient - the tar achive must be unzipped; fast - OS accesses objects by filename in O(1)
 
-1. reading images directly from the tar archive
-2. reading extracted images from a normal directory structure
-
-Direct tar reading is memory-efficient, but slower. For the final experiment, the extracted files were used because they provide faster training and evaluation on a local CPU environment.
+For the final experiment, the extracted files were used because they provide faster training and evaluation on a local CPU environment.
 
 ### 4.3 Image preprocessing
 
 Every parking-slot image is preprocessed in the following way:
 
 - resize to 128 x 128 so that all images have the same input size for the CNN
-- convert to RGB to ensure a consistent three-channel color representation
-- normalize pixel values to [0, 1] to scale the raw image intensities into a stable numeric range
-- apply channel-wise normalization using standard mean and standard deviation to make training more stable and improve convergence
+- since images can be stored in various formats, convert to RGB to ensure a consistent three-channel color representation
+- normalize pixel values to [0, 1] to scale the raw image intensities(0 to 255) into a stable numeric range
+- apply channel-wise normalization using standard mean and standard deviation to make training more stable(decreases chances of exploding gradients by making numbers small and centered) and improve convergence(by enforcing weight uniformity: brightness of pixels equally influencing model as darker ones)
+Note on using colored images:
+While using colored images increases number of pixels to process, color contains contrast information that can hep CNN to differentiate by color.
 
-This produces a consistent input tensor for the CNN.
+This step produces a consistent input tensor for the CNN.
 
 ### 4.4 Data augmentation
 
@@ -146,17 +146,13 @@ These transformations were intentionally small. Strong augmentation could damage
 
 The baseline model is a custom convolutional neural network designed to remain lightweight and trainable on CPU.
 
-### 5.1 Structure
-
-The model contains:
-
-- 4 convolutional layers
+- 4 convolutional layers : vehicles are not too complicated objects that would require more convolutional layers
 - batch normalization after each convolution
-- ReLU nonlinearities
-- max-pooling for progressive spatial downsampling
-- adaptive average pooling
+- ReLU nonlinearities : industry standard
+- max-pooling spatial downsampling : translational invariance
+- adaptive average pooling : transforms data into 1d 
 - a fully connected classifier head
-- dropout regularization
+- dropout regularization : makes the model more robust, as it can not rely on specific feature maps
 
 Shortly, the model works as follows:
 
